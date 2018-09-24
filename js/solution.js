@@ -4,7 +4,12 @@ const urlApi = 'https://neto-api.herokuapp.com',
     currentImage = document.querySelector('.current-image'),
     imgLoader = document.querySelector('.image-loader'),
     appWrap = document.querySelector('.wrap.app'),
-    menu = document.querySelector('.menu');
+    menu = document.querySelector('.menu'),
+    btnAddImg = document.querySelector('.new'),
+    errorWrap = document.querySelector('.error'),
+    errorText = document.querySelector('.error__message'),
+    burger = document.querySelector('.burger'),
+    commentsForm = document.querySelector('.comments__form');
 
 //Переменные нужны для Drag&Drop
 let movedPiece = null,
@@ -14,6 +19,8 @@ let movedPiece = null,
     maxY,
     shiftX = 0,
     shiftY = 0;
+
+let imgId = null;
 
 /**
  * Скрывает элемент с показа
@@ -29,6 +36,15 @@ function hideElement(el) {
  */
 function showElement(el) {
     el.style.display = '';
+}
+
+function showError(text, delay = 2) {
+    errorText.innerText = text;
+    showElement(errorWrap);
+
+    setTimeout(function() {
+        hideElement(errorWrap);
+    }, delay * 1000);
 }
 
 /*----------Начало функционала перетаскивания меню Drag&Drop----------*/
@@ -87,3 +103,182 @@ function throttle(func, delay = 0) {
 document.addEventListener('mousedown', dragStart);
 document.addEventListener('mousemove', throttle(drag));
 document.addEventListener('mouseup', drop);
+
+/*----------Режим публикации изображения----------*/
+/**
+ * Посылаем запрос к API Нетологии
+ * @param url
+ * @param method
+ * @param body
+ * @param header
+ * @returns {Promise<Response>}
+ */
+function sendRequest(url, method, body = null, header = {}) {
+    const sendBody = (method === 'POST') ? body : null,
+        requestParams = {
+        credentials: 'same-origin',
+        method,
+        sendBody,
+        header
+    };
+
+    return fetch(url, requestParams).then(
+        (result) => result.json(),
+        (error) => {
+            throw new Error(error);
+        }
+    );
+}
+
+/**
+ * Удаляет расширение у файла
+ * @param file
+ * @returns {void | string | *}
+ */
+function delFileExtension(file) {
+    const regExp = new RegExp(/\.[^.]+$/gi);
+
+    return file.replace(regExp, '');
+}
+
+/**
+ * Формирует тело запроса для дальнейшей отправки
+ * @param files
+ * @returns {FormData}
+ */
+function getBodyForRequest(files) {
+    const formData = new FormData();
+
+    files.forEach(file => {
+        const fileName = delFileExtension(file.name);
+        formData.append('title', fileName);
+        formData.append('image', file);
+    });
+    return formData;
+}
+
+function sendFile(files) {
+    sendRequest(`${urlApi}/pic`, 'POST', getBodyForRequest(files))
+        .then((result) => {
+            //Получаем данные о картинке
+            sendRequest(`${urlApi}/pic/${result.id}`, 'GET')
+                .then((result) => {
+                    imgId = result.id;
+                    localStorage.imgId = result.id;
+                    localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
+                    currentImage.src = result.url;
+                    delComments();
+                });
+        });
+}
+
+/**
+ * Удаляем все комментарии на холсте
+ */
+function delComments() {
+    const comments = document.querySelectorAll('.comments__form');
+
+    if (comments) {
+        comments.forEach(comment => {
+            appWrap.removeChild(comment);
+        })
+    }
+}
+
+/**
+ * Загружаем картинку по нажатию кнопки
+ * @param event
+ */
+function loadImgByBtn(event) {
+    event.preventDefault();
+
+    const input = document.createElement('input');
+    input.setAttribute('id', 'fileInput');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/jpeg, image/png');
+    input.click();
+
+    input.addEventListener('change', event => {
+        const files = Array.from(event.currentTarget.files);
+
+        currentImage.src = '';
+        showElement(imgLoader);
+
+        sendFile(files);
+    });
+}
+
+btnAddImg.addEventListener('click', loadImgByBtn);
+
+/**
+ * Загружаем картинку по перетаскиванию на холст
+ * @param event
+ */
+function loadImgByDrag(event) {
+    event.preventDefault();
+
+    const files = Array.from(event.dataTransfer.files);
+
+    if (currentImage.classList.contains('load')) {
+        showError('Чтобы загрузить новое изображение используйте пункт "Загрузить новое"');
+        return;
+    }
+
+    files.forEach(file => {
+        if (file.type === 'image/jpeg' || file.type === 'image/png') {
+            showElement(imgLoader);
+            sendFile(files);
+        } else {
+            showError('Неверный формат файла. Пожалуйста, выберите изображение в формате .jpg или .png');
+        }
+    });
+}
+
+appWrap.addEventListener('dragover', event => event.preventDefault());
+appWrap.addEventListener('drop', loadImgByDrag);
+
+function activateDefault() {
+    let curUrl = `${window.location.href}`;
+    let url = new URL(curUrl);
+    let urlImgId = url.searchParams.get('id');
+
+    /**
+     * Сохраняем id картинки в хранилище
+     */
+    function saveIdImgFromUrl() {
+        if (!urlImgId) {
+            return;
+        }
+
+        localStorage.imgId = urlImgId;
+    }
+
+    saveIdImgFromUrl();
+
+    currentImage.src = '';
+    menu.dataset.state = 'initial';
+    hideElement(burger);
+
+    if (commentsForm) {
+        appWrap.removeChild(commentsForm);
+    }
+
+    menu.style.left = localStorage.menuPosLeft;
+    menu.style.top = localStorage.menuPosTop;
+
+    if (localStorage.imgId) {
+        sendRequest(`${urlApi}/pic/${localStorage.imgId}`, 'GET')
+            .then((result) => {
+                imgId = result.id;
+                localStorage.imgId = result.id;
+                localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
+
+                hideElement(imgLoader);
+                currentImage.src = result.url;
+                delComments();
+                currentImage.classList.add('load');
+            })
+    }
+}
+
+activateDefault();
