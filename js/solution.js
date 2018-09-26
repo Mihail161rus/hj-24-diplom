@@ -9,7 +9,12 @@ const urlApi = 'https://neto-api.herokuapp.com',
     errorWrap = document.querySelector('.error'),
     errorText = document.querySelector('.error__message'),
     burger = document.querySelector('.burger'),
-    commentsForm = document.querySelector('.comments__form');
+    commentsForm = document.querySelector('.comments__form'),
+    menuItems = menu.querySelectorAll('.mode'),
+    shareLinkInput = document.querySelector('.menu__url'),
+    shareBtn = document.querySelector('.share'),
+    commentsBtn = document.querySelector('.comments'),
+    commentsToggle = document.querySelectorAll('.menu__toggle');
 
 //Переменные нужны для Drag&Drop
 let movedPiece = null,
@@ -182,10 +187,14 @@ function sendFile(files) {
                     localStorage.imgId = result.id;
                     localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
                     currentImage.src = result.url;
-                    hideElement(imgLoader);
-                    delComments();
-                    currentImage.classList.add('is-loaded');
-                });
+
+                    currentImage.addEventListener('load', () => {
+                        hideElement(imgLoader);
+                        delComments();
+                        currentImage.classList.add('is-loaded');
+                    });
+                })
+                .then(initReviewMode);
         });
 }
 
@@ -287,18 +296,118 @@ function initApp() {
     menu.style.top = localStorage.menuPosTop;
 
     if (localStorage.imgId) {
+        showElement(imgLoader);
+
         sendRequest(`${urlApi}/pic/${localStorage.imgId}`, 'GET')
             .then((result) => {
                 imgId = result.id;
                 localStorage.imgId = result.id;
                 localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
-
-                hideElement(imgLoader);
                 currentImage.src = result.url;
-                delComments();
-                currentImage.classList.add('is-loaded');
+
+                currentImage.addEventListener('load', () => {
+                    hideElement(imgLoader);
+                    delComments();
+                    currentImage.classList.add('is-loaded');
+                });
+
+                return result;
             })
+            .then((result) => {
+                initReviewMode(result);
+            });
     }
 }
+
+/*----------Режим рецензирования----------*/
+/**
+ * Инициализирует режим "Поделиться"
+ * @param data
+ */
+function initShareMode(data) {
+    menuItems.forEach(item => {
+        item.dataset.state = '';
+        hideElement(item);
+    });
+    currentImage.addEventListener('load', () => {
+        toggleShowComments(isCommentsActive());
+    });
+    shareLinkInput.value = localStorage.imgLink;
+    shareBtn.dataset.state = 'selected';
+    showElement(shareBtn);
+}
+
+/**
+ * Инициализирует режим рецензирования
+ * @param data
+ */
+function initReviewMode(data) {
+    menu.dataset.state = '';
+    showElement(burger);
+    initShareMode(data);
+}
+
+/**
+ * Открывает все элементы меню по кнопке "бургер"
+ */
+function showAllItemsMenu() {
+    menuItems.forEach(item => {
+        item.dataset.state = '';
+        showElement(item);
+    });
+}
+
+burger.addEventListener('click', showAllItemsMenu);
+
+/**
+ * Проверяет положение переключателя "показать/скрыть комментарии"
+ * @returns {boolean}
+ */
+function isCommentsActive(){
+    if (commentsBtn.dataset.state !== 'selected') {
+        return false
+    }
+
+    commentsToggle.forEach(input => {
+        if (input.value === 'off' && input.checked) {
+            return false;
+        }
+    });
+    return true;
+}
+
+/**
+ * Инициализация режима комментирования
+ */
+function initCommentsMode() {
+    menuItems.forEach(item => {
+        item.dataset.state = '';
+        hideElement(item);
+    });
+    commentsBtn.dataset.state = 'selected';
+    showElement(commentsBtn);
+    toggleShowComments(isCommentsActive());
+}
+
+/**
+ * Показывает/скрывает комментарии на холсте
+ * @param bool
+ */
+function toggleShowComments(bool) {
+    const comments = document.querySelectorAll('.comments__form');
+
+    if (bool) {
+        comments.forEach(comment => {
+            showElement(comment);
+        });
+    } else {
+        comments.forEach(comment => {
+            hideElement(comment);
+        })
+    }
+}
+
+commentsBtn.addEventListener('click', initCommentsMode);
+
 //localStorage.clear();
 initApp();
