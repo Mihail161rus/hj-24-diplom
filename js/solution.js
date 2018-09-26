@@ -20,6 +20,7 @@ let movedPiece = null,
     shiftX = 0,
     shiftY = 0;
 
+//id картинки, нужен для ссылки "поделиться"
 let imgId = null;
 
 /**
@@ -38,7 +39,12 @@ function showElement(el) {
     el.style.display = '';
 }
 
-function showError(text, delay = 2) {
+/**
+ * Показывает текст ошибки и скрывает через заданный промежуток времени
+ * @param text
+ * @param delay
+ */
+function showError(text, delay = 4) {
     errorText.innerText = text;
     showElement(errorWrap);
 
@@ -86,6 +92,12 @@ function drop() {
     }
 }
 
+/**
+ * Функция "тормозилка"
+ * @param func
+ * @param delay
+ * @returns {Function}
+ */
 function throttle(func, delay = 0) {
     let isWaiting = false;
     return function () {
@@ -106,7 +118,7 @@ document.addEventListener('mouseup', drop);
 
 /*----------Режим публикации изображения----------*/
 /**
- * Посылаем запрос к API Нетологии
+ * Отправляет запрос к API Нетологии
  * @param url
  * @param method
  * @param body
@@ -114,11 +126,10 @@ document.addEventListener('mouseup', drop);
  * @returns {Promise<Response>}
  */
 function sendRequest(url, method, body = null, header = {}) {
-    const sendBody = (method === 'POST') ? body : null,
-        requestParams = {
+    const requestParams = {
         credentials: 'same-origin',
         method,
-        sendBody,
+        body,
         header
     };
 
@@ -131,7 +142,7 @@ function sendRequest(url, method, body = null, header = {}) {
 }
 
 /**
- * Удаляет расширение у файла
+ * Удаляет расширение у загружаемого файла
  * @param file
  * @returns {void | string | *}
  */
@@ -157,6 +168,10 @@ function getBodyForRequest(files) {
     return formData;
 }
 
+/**
+ * Отправляет файл на сервер
+ * @param files
+ */
 function sendFile(files) {
     sendRequest(`${urlApi}/pic`, 'POST', getBodyForRequest(files))
         .then((result) => {
@@ -167,7 +182,9 @@ function sendFile(files) {
                     localStorage.imgId = result.id;
                     localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
                     currentImage.src = result.url;
+                    hideElement(imgLoader);
                     delComments();
+                    currentImage.classList.add('is-loaded');
                 });
         });
 }
@@ -219,7 +236,7 @@ function loadImgByDrag(event) {
 
     const files = Array.from(event.dataTransfer.files);
 
-    if (currentImage.classList.contains('load')) {
+    if (currentImage.classList.contains('is-loaded')) {
         showError('Чтобы загрузить новое изображение используйте пункт "Загрузить новое"');
         return;
     }
@@ -237,9 +254,12 @@ function loadImgByDrag(event) {
 appWrap.addEventListener('dragover', event => event.preventDefault());
 appWrap.addEventListener('drop', loadImgByDrag);
 
-function activateDefault() {
-    let curUrl = `${window.location.href}`;
-    let url = new URL(curUrl);
+/**
+ * Инициализация приложения при старте
+ */
+function initApp() {
+    let currentUrl = `${window.location.href}`;
+    let url = new URL(currentUrl);
     let urlImgId = url.searchParams.get('id');
 
     /**
@@ -276,9 +296,9 @@ function activateDefault() {
                 hideElement(imgLoader);
                 currentImage.src = result.url;
                 delComments();
-                currentImage.classList.add('load');
+                currentImage.classList.add('is-loaded');
             })
     }
 }
-
-activateDefault();
+//localStorage.clear();
+initApp();
