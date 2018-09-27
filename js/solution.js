@@ -14,7 +14,8 @@ const urlApi = 'https://neto-api.herokuapp.com',
     shareLinkInput = document.querySelector('.menu__url'),
     shareBtn = document.querySelector('.share'),
     commentsBtn = document.querySelector('.comments'),
-    commentsToggle = document.querySelectorAll('.menu__toggle');
+    commentsToggle = document.querySelectorAll('.menu__toggle'),
+    drawBtn = document.querySelector('.draw');
 
 //Переменные нужны для Drag&Drop
 let movedPiece = null,
@@ -409,5 +410,20 @@ function toggleShowComments(bool) {
 
 commentsBtn.addEventListener('click', initCommentsMode);
 
+/**
+ * Инициализация режима рисования
+ */
+function initDrawMode() {
+    menuItems.forEach(item => {
+        item.dataset.state = '';
+        hideElement(item);
+    });
+    drawBtn.dataset.state = 'selected';
+    showElement(drawBtn);
+    toggleShowComments(isCommentsActive());
+}
+
+drawBtn.addEventListener('click', initDrawMode);
+
 //localStorage.clear();
-initApp();
+document.addEventListener('DOMContentLoaded', initApp);
