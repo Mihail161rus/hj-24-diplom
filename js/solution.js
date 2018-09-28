@@ -1,6 +1,6 @@
 'use strict';
 
-const URL_API = 'https://neto-api.herokuapp.com',
+const URL_API = 'https://neto-api.herokuapp.com/pic',
   URL_WSS = 'wss://neto-api.herokuapp.com/pic',
   MSG_TYPE_COMMENT = 'comment',
   MSG_TYPE_MASK = 'mask',
@@ -155,7 +155,7 @@ function sendRequest(url, method, body = null, header = {}) {
     credentials: 'same-origin',
     method,
     body,
-    header
+    headers: header
   };
 
   return fetch(url, requestParams).then(
@@ -198,10 +198,10 @@ function getBodyForRequest(files) {
  * @param files
  */
 function sendFile(files) {
-  sendRequest(`${URL_API}/pic`, 'POST', getBodyForRequest(files))
+  sendRequest(`${URL_API}`, 'POST', getBodyForRequest(files))
     .then((result) => {
       //Получаем данные о картинке
-      sendRequest(`${URL_API}/pic/${result.id}`, 'GET')
+      sendRequest(`${URL_API}/${result.id}`, 'GET')
         .then((result) => {
           imgId = result.id;
           localStorage.imgId = result.id;
@@ -243,9 +243,15 @@ function loadImgByBtn(event) {
   input.setAttribute('type', 'file');
   input.setAttribute('accept', 'image/jpeg, image/png');
   input.click();
+  delComments();
 
-  input.addEventListener('change', event => {
+  input.addEventListener('change', (event) => {
     const files = Array.from(event.currentTarget.files);
+
+    if (canvas) {
+      canvas.style.background = '';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
     currentImage.src = '';
     showElement(imgLoader);
@@ -315,7 +321,7 @@ function initApp() {
   if (localStorage.imgId) {
     showElement(imgLoader);
 
-    sendRequest(`${URL_API}/pic/${localStorage.imgId}`, 'GET')
+    sendRequest(`${URL_API}/${localStorage.imgId}`, 'GET')
       .then((result) => {
         imgId = result.id;
         localStorage.imgId = result.id;
@@ -359,6 +365,8 @@ function initShareMode(data) {
   shareBtn.dataset.state = 'selected';
   showElement(shareBtn);
 }
+
+shareBtn.addEventListener('click', initShareMode);
 
 /**
  * Выполняет копирование ссылки из поля "поделиться"
@@ -703,7 +711,7 @@ function createElementFromTemplate(objTemplate) {
     return objTemplate.reduce(function (fragment, currentItem) {
       fragment.appendChild(createElementFromTemplate(currentItem));
       return fragment;
-    }, document.createDocumentFragment(objTemplate.tag));
+    }, document.createDocumentFragment());
   }
 
   const element = document.createElement(objTemplate.tag);
