@@ -66,17 +66,20 @@ function showElement(el) {
 }
 
 /**
- * Показывает текст ошибки и скрывает через заданный промежуток времени
+ * Показывает текст ошибки
  * @param text
- * @param delay
  */
-function showError(text, delay = 4) {
+function showError(text) {
   errorText.innerText = text;
   showElement(errorWrap);
+}
 
-  setTimeout(function () {
-    hideElement(errorWrap);
-  }, delay * 1000);
+/**
+ * Скрывает блок с ошибкой
+ */
+function hideError() {
+  errorText.innerText = '';
+  hideElement(errorWrap);
 }
 
 /*----------Начало функционала перетаскивания меню Drag&Drop----------*/
@@ -141,6 +144,12 @@ function throttle(func, delay = 0) {
 document.addEventListener('mousedown', dragStart);
 document.addEventListener('mousemove', throttle(drag));
 document.addEventListener('mouseup', drop);
+
+function autoMoveMenu() {
+  while (menu.offsetHeight > 66) {
+    menu.style.left = (appWrap.offsetWidth - menu.offsetWidth) - 1 + 'px';
+  }
+}
 
 /*----------Режим публикации изображения----------*/
 /**
@@ -243,20 +252,28 @@ function loadImgByBtn(event) {
   input.setAttribute('type', 'file');
   input.setAttribute('accept', 'image/jpeg, image/png');
   input.click();
+  hideError();
   delComments();
 
   input.addEventListener('change', (event) => {
     const files = Array.from(event.currentTarget.files);
 
-    if (canvas) {
-      canvas.style.background = '';
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
 
-    currentImage.src = '';
-    showElement(imgLoader);
+    files.forEach(file => {
+      if (file.type === 'image/jpeg' || file.type === 'image/png') {
+        if (canvas) {
+          canvas.style.background = '';
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
 
-    sendFile(files);
+        currentImage.src = '';
+        showElement(imgLoader);
+
+        sendFile(files);
+      } else {
+        showError('Неверный формат файла. Пожалуйста, выберите изображение в формате .jpg или .png');
+      }
+    });
   });
 }
 
@@ -333,6 +350,8 @@ function initApp() {
  * @param data
  */
 function initShareMode(data) {
+  hideError();
+
   menuItems.forEach(item => {
     item.dataset.state = '';
     hideElement(item);
@@ -346,9 +365,10 @@ function initShareMode(data) {
     toggleShowComments(isCommentsActive());
   });
 
-  shareLinkInput.value = localStorage.imgLink;
+  shareLinkInput.value = urlImg;
   shareBtn.dataset.state = 'selected';
   showElement(shareBtn);
+  autoMoveMenu();
 }
 
 shareBtn.addEventListener('click', initShareMode);
@@ -375,19 +395,27 @@ copyUrlBtn.addEventListener('click', copyUrl);
 function initReviewMode(data) {
   menu.dataset.state = '';
   showElement(burger);
-  initShareMode(data);
+
+  if (imgId) {
+    initCommentsMode();
+  } else {
+    initShareMode(data);
+  }
 }
 
 /**
  * Открывает все элементы меню по кнопке "бургер"
  */
 function showAllItemsMenu() {
+  hideError();
   delEmptyChats();
 
   menuItems.forEach(item => {
     item.dataset.state = '';
     showElement(item);
   });
+
+  autoMoveMenu();
 }
 
 burger.addEventListener('click', showAllItemsMenu);
@@ -413,6 +441,8 @@ function isCommentsActive() {
 commentsToggle.forEach(input => {
   delEmptyChats();
   input.addEventListener('click', (event) => {
+    hideError();
+
     const radioValue = event.target.value,
       comments = document.querySelectorAll('.comments__form');
 
@@ -454,6 +484,7 @@ function initCommentsMode() {
  * @param bool
  */
 function toggleShowComments(bool) {
+  hideError();
   delEmptyChats();
 
   const comments = document.querySelectorAll('.comments__form');
@@ -475,6 +506,8 @@ commentsBtn.addEventListener('click', initCommentsMode);
  * Инициализация режима рисования
  */
 function initDrawMode() {
+  hideError();
+
   menuItems.forEach(item => {
     item.dataset.state = '';
     hideElement(item);
@@ -758,7 +791,7 @@ function createNewChatForm(posX, posY) {
       'Content-Type': 'application/x-www-form-urlencoded'
     };
 
-    sendRequest(`${URL_API}/${localStorage.imgId}/comments`, 'POST', msgParams, headerForSendMsg)
+    sendRequest(`${URL_API}/${imgId}/comments`, 'POST', msgParams, headerForSendMsg)
       .then((result) => {
         hideElement(newFormLoader.parentNode);
         addMsgToChat(newChatForm, result);
