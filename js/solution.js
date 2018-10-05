@@ -17,7 +17,6 @@ const currentImage = document.querySelector('.current-image'),
   errorWrap = document.querySelector('.error'),
   errorText = document.querySelector('.error__message'),
   burger = document.querySelector('.burger'),
-  commentsForm = document.querySelector('.comments__form'),
   menuItems = menu.querySelectorAll('.mode'),
   shareLinkInput = document.querySelector('.menu__url'),
   shareBtn = document.querySelector('.share'),
@@ -34,6 +33,8 @@ let canvasWrap,
   ctx,
   currentColor = null,
   drawMode = false,
+  curves = [],
+  needToRedraw = false,
   wssConnection,
   urlImg;
 
@@ -145,6 +146,9 @@ document.addEventListener('mousedown', dragStart);
 document.addEventListener('mousemove', throttle(drag));
 document.addEventListener('mouseup', drop);
 
+/**
+ * Сдвигаем блок меню левее, если он не помещается целиком на экране
+ */
 function autoMoveMenu() {
   while (menu.offsetHeight > 66) {
     menu.style.left = (appWrap.offsetWidth - menu.offsetWidth) - 1 + 'px';
@@ -322,6 +326,7 @@ function initApp() {
   menu.style.left = localStorage.menuPosLeft;
   menu.style.top = localStorage.menuPosTop;
 
+  //Если в текущей ссылке есть GET параметр id, то подгружаем соответствующую картинку
   if (imgId) {
     showElement(imgLoader);
 
@@ -347,22 +352,13 @@ function initApp() {
 /*----------Режим рецензирования----------*/
 /**
  * Инициализирует режим "Поделиться"
- * @param data
  */
-function initShareMode(data) {
+function initShareMode() {
   hideError();
 
   menuItems.forEach(item => {
     item.dataset.state = '';
     hideElement(item);
-  });
-
-  currentImage.addEventListener('load', () => {
-    createCanvasWrap();
-    createCanvas();
-    createMsg(data);
-    wss();
-    toggleShowComments(isCommentsActive());
   });
 
   shareLinkInput.value = urlImg;
@@ -393,14 +389,25 @@ copyUrlBtn.addEventListener('click', copyUrl);
  * @param data
  */
 function initReviewMode(data) {
+  let currentUrl = new URL(`${window.location.href}`);
+  let urlImgId = currentUrl.searchParams.get('id');
+
   menu.dataset.state = '';
   showElement(burger);
 
-  if (imgId) {
-    initCommentsMode();
-  } else {
+  if (urlImgId === null) {
     initShareMode(data);
+  } else {
+    initCommentsMode();
   }
+
+  currentImage.addEventListener('load', () => {
+    createCanvasWrap();
+    createCanvas();
+    createMsg(data);
+    wss();
+    toggleShowComments(isCommentsActive());
+  });
 }
 
 /**
@@ -993,6 +1000,7 @@ function createCanvas() {
   }
 
   const {width, height} = getComputedStyle(currentImage);
+  curves = [];
 
   canvas = createElementFromTemplate(canvasTemplate(width, height));
   ctx = canvas.getContext('2d');
@@ -1006,10 +1014,17 @@ function createCanvas() {
 
     event.preventDefault();
     drawMode = true;
+
+    const curve = [];
+    curve.color = currentColor;
+    curve.push([event.offsetX, event.offsetY]);
+    curves.push(curve);
+    needToRedraw = true;
   });
 
   //Отпустили кнопку мыши
   canvas.addEventListener("mouseup", () => {
+    ctx.closePath();
     drawMode = false;
   });
 
@@ -1024,7 +1039,9 @@ function createCanvas() {
       return;
     }
 
-    drawLine(event);
+    const point = [event.offsetX, event.offsetY];
+    curves[curves.length - 1].push(point);
+    needToRedraw = true;
     debounceSendMask();
   });
 
@@ -1040,20 +1057,52 @@ function createCanvas() {
   });
 }
 
-/**
- * Рисуем линию
- * @param event
- */
-function drawLine(event) {
-  if (drawMode) {
-    ctx.beginPath();
-    ctx.fillStyle = currentColor;
-    ctx.arc(event.offsetX, event.offsetY, BRUSH_THICKNESS, 0, 2 * Math.PI);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.fill();
-  }
+/*Начало секции - функции для правильной отрисовки сплошной линии на канвасе*/
+function circle(point) {
+  ctx.beginPath();
+  ctx.arc(...point, BRUSH_THICKNESS / 2, 0, 2 * Math.PI);
+  ctx.fill();
 }
+
+function smoothCurveBetween(p1, p2) {
+  const cp = p1.map((coord, idx) => (coord + p2[idx]) / 2);
+  ctx.quadraticCurveTo(...p1, ...cp);
+}
+
+function smoothCurve(points) {
+  ctx.beginPath();
+  ctx.lineWidth = BRUSH_THICKNESS;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  ctx.moveTo(...points[0]);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    smoothCurveBetween(points[i], points[i + 1]);
+  }
+
+  ctx.stroke();
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  curves.forEach((curve) => {
+      ctx.strokeStyle = curve.color;
+      ctx.fillStyle = curve.color;
+      circle(curve[0]);
+      smoothCurve(curve);
+    });
+}
+
+function tick() {
+  if (needToRedraw) {
+    redraw();
+    needToRedraw = false;
+  }
+
+  window.requestAnimationFrame(tick);
+}
+/*Конец секции - функции для правильной отрисовки сплошной линии на канвасе*/
 
 /**
  * Отправляем маску канваса на сервер через wss
@@ -1082,5 +1131,6 @@ function debounce(functionName, delay = 0) {
 
 const debounceSendMask = debounce(sendMaskToServer, 2000);
 
-//localStorage.clear();
+tick();
+
 document.addEventListener('DOMContentLoaded', initApp);
