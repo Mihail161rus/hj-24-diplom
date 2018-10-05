@@ -468,6 +468,7 @@ commentsToggle.forEach(input => {
  * Инициализация режима комментирования
  */
 function initCommentsMode() {
+  autoMoveMenu();
   delEmptyChats();
 
   menuItems.forEach(item => {
