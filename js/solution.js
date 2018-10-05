@@ -34,7 +34,8 @@ let canvasWrap,
   ctx,
   currentColor = null,
   drawMode = false,
-  wssConnection;
+  wssConnection,
+  urlImg;
 
 //Переменные нужны для Drag&Drop
 let movedPiece = null,
@@ -204,8 +205,7 @@ function sendFile(files) {
       sendRequest(`${URL_API}/${result.id}`, 'GET')
         .then((result) => {
           imgId = result.id;
-          localStorage.imgId = result.id;
-          localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
+          urlImg = `${window.location.origin}${window.location.pathname}?id=${imgId}`;
           currentImage.src = result.url;
 
           currentImage.addEventListener('load', () => {
@@ -295,20 +295,7 @@ appWrap.addEventListener('drop', loadImgByDrag);
 function initApp() {
   let currentUrl = `${window.location.href}`;
   let url = new URL(currentUrl);
-  let urlImgId = url.searchParams.get('id');
-
-  /**
-   * Сохраняем id картинки в хранилище
-   */
-  function saveIdImgFromUrl() {
-    if (!urlImgId) {
-      return;
-    }
-
-    localStorage.imgId = urlImgId;
-  }
-
-  saveIdImgFromUrl();
+  imgId = url.searchParams.get('id');
 
   currentImage.src = '';
   menu.dataset.state = 'initial';
@@ -318,14 +305,12 @@ function initApp() {
   menu.style.left = localStorage.menuPosLeft;
   menu.style.top = localStorage.menuPosTop;
 
-  if (localStorage.imgId) {
+  if (imgId) {
     showElement(imgLoader);
 
-    sendRequest(`${URL_API}/${localStorage.imgId}`, 'GET')
+    sendRequest(`${URL_API}/${imgId}`, 'GET')
       .then((result) => {
-        imgId = result.id;
-        localStorage.imgId = result.id;
-        localStorage.imgLink = `${window.location.origin}${window.location.pathname}?id=${localStorage.imgId}`;
+        urlImg = `${window.location.origin}${window.location.pathname}?id=${imgId}`;
         currentImage.src = result.url;
 
         currentImage.addEventListener('load', () => {
