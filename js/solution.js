@@ -220,7 +220,6 @@ function sendFile(files) {
           imgId = result.id;
           urlImg = `${window.location.origin}${window.location.pathname}?id=${imgId}`;
           currentImage.src = result.url;
-          console.log(urlImg);
           history.pushState(null, null, urlImg);
 
           currentImage.addEventListener('load', () => {
@@ -241,7 +240,7 @@ function delComments() {
 
   if (comments) {
     comments.forEach(comment => {
-      appWrap.removeChild(comment);
+      comment.parentElement.removeChild(comment);
     })
   }
 }
@@ -715,6 +714,7 @@ function canvasTemplate(width, height) {
 function canvasWrapTemplate(width, height) {
   return {
     tag: 'div',
+    class: 'wrap__canvas',
     attrs: {
       style: `position: absolute; top: 50%; left: 50%; display: block; width: ${width}; height: ${height}; transform: translate(-50%, -50%);`
     }
