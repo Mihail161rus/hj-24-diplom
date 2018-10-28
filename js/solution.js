@@ -220,6 +220,8 @@ function sendFile(files) {
           imgId = result.id;
           urlImg = `${window.location.origin}${window.location.pathname}?id=${imgId}`;
           currentImage.src = result.url;
+          console.log(urlImg);
+          history.pushState(null, null, urlImg);
 
           currentImage.addEventListener('load', () => {
             hideElement(imgLoader);
